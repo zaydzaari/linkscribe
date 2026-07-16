@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "linkscribe"
-version = "0.1.0"
+version = "0.1.1"
 description = "A resource-aware media transcription gateway for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,6 +36,7 @@ dev = [
   "pytest>=9.0.3,<10",
   "pytest-cov>=5,<8",
   "ruff>=0.9,<1",
+  "setuptools>=83",
 ]
 
 [project.urls]
