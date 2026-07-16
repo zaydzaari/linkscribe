@@ -41,7 +41,7 @@ jobs:
         run: python -m pip_audit --local --progress-spinner off
 
       - name: Test
-        run: pytest --cov=linkscribe --cov=clients --cov-report=term-missing --cov-fail-under=80
+        run: python -m pytest --cov=linkscribe --cov=clients --cov-report=term-missing --cov-fail-under=80
 
       - name: Build distributions
         if: matrix.python-version == '3.12'

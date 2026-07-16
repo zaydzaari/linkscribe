@@ -183,7 +183,7 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ruff check .
-pytest --cov=linkscribe --cov=clients --cov-report=term-missing
+python -m pytest --cov=linkscribe --cov=clients --cov-report=term-missing
 ```
 
 The test suite covers authentication, URL validation, queue transitions, cleanup, transcript chunking, client behavior, worker recovery, and media command construction.

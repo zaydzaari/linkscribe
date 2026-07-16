@@ -4,7 +4,7 @@ install:
 	python -m pip install -e ".[dev]"
 
 test:
-	pytest --cov=linkscribe --cov-report=term-missing
+	python -m pytest --cov=linkscribe --cov=clients --cov-report=term-missing
 
 lint:
 	ruff check .

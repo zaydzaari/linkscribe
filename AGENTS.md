@@ -29,7 +29,7 @@ Run before committing:
 
 ```bash
 ruff check .
-pytest --cov=linkscribe --cov=clients --cov-report=term-missing
+python -m pytest --cov=linkscribe --cov=clients --cov-report=term-missing
 python -m build
 ```
 
