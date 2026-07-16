@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: LinkScribe
+  version: 0.1.0
+  description: Create and retrieve English transcripts from public media links.
+servers:
+  - url: https://YOUR_PRIVATE_DOMAIN
+paths:
+  /v1/jobs:
+    post:
+      operationId: createTranscriptionJob
+      summary: Start transcription for a public media URL
+      description: Submit one YouTube, TikTok, or Instagram URL. Returns immediately with a job ID.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /v1/jobs/{job_id}:
+    get:
+      operationId: getTranscriptionJob
+      summary: Check a transcription job
+      description: Wait up to 25 seconds for progress. Call again while status is queued or processing.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: wait_seconds
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 25, default: 25 }
+      responses:
+        "200":
+          description: Current job state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+  /v1/jobs/{job_id}/transcript:
+    get:
+      operationId: getTranscriptChunk
+      summary: Read a completed transcript in chunks
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1000, maximum: 20000, default: 12000 }
+      responses:
+        "200":
+          description: Transcript chunk
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job_id, text, offset, total_characters]
+                properties:
+                  job_id: { type: string }
+                  text: { type: string }
+                  offset: { type: integer }
+                  next_offset: { type: [integer, "null"] }
+                  total_characters: { type: integer }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Job:
+      type: object
+      required: [id, status, source_url, created_at, updated_at, expires_at]
+      properties:
+        id: { type: string }
+        status:
+          type: string
+          enum: [queued, processing, completed, failed, cancelled]
+        source_url: { type: string }
+        title: { type: [string, "null"] }
+        source: { type: [string, "null"] }
+        duration_seconds: { type: [number, "null"] }
+        transcript: { type: [string, "null"] }
+        transcript_truncated: { type: boolean }
+        transcript_characters: { type: [integer, "null"] }
+        queue_position: { type: [integer, "null"] }
+        error: { type: [string, "null"] }
+        created_at: { type: string }
+        updated_at: { type: string }
+        expires_at: { type: string }

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinkScribe Job Console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172126;
+      --muted: #617078;
+      --line: #d9e0e3;
+      --paper: #f7f9fa;
+      --white: #ffffff;
+      --cyan: #087e8b;
+      --coral: #e05b47;
+      --green: #2f7d4a;
+      --amber: #a66206;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    button, input { font: inherit; }
+    header { background: var(--ink); color: var(--white); border-bottom: 4px solid var(--cyan); }
+    .topbar { min-height: 68px; max-width: 1180px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 750; }
+    .mark { width: 30px; height: 30px; display: grid; grid-template-columns: repeat(5, 3px); gap: 3px; align-items: center; justify-content: center; background: var(--cyan); border-radius: 4px; }
+    .mark i { display: block; background: white; height: 8px; }
+    .mark i:nth-child(2), .mark i:nth-child(4) { height: 16px; }
+    .mark i:nth-child(3) { height: 22px; }
+    .health { display: flex; align-items: center; gap: 8px; color: #d5e2e5; font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+    .dot.ok { background: #54c77a; }
+    main { max-width: 1180px; margin: 0 auto; padding: 34px 24px 60px; }
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0; }
+    .subtitle { color: var(--muted); margin: 0 0 28px; }
+    .workspace { display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 24px; align-items: start; }
+    .panel { background: var(--white); border: 1px solid var(--line); border-radius: 6px; }
+    .panel-head { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    .panel-head h2 { margin: 0; font-size: 15px; }
+    .form { padding: 18px; display: grid; gap: 16px; }
+    label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; font-weight: 650; }
+    input { width: 100%; min-height: 42px; border: 1px solid #aebbc0; border-radius: 4px; padding: 9px 11px; color: var(--ink); background: white; }
+    input:focus { outline: 3px solid #bce7eb; border-color: var(--cyan); }
+    .actions { display: flex; gap: 10px; }
+    button { border: 0; min-height: 40px; padding: 9px 15px; border-radius: 4px; font-weight: 720; cursor: pointer; }
+    button.primary { background: var(--cyan); color: white; flex: 1; }
+    button.secondary { background: #e9eef0; color: var(--ink); }
+    button:disabled { cursor: wait; opacity: .58; }
+    .result { min-height: 430px; }
+    .empty { min-height: 360px; display: grid; place-items: center; color: var(--muted); text-align: center; padding: 24px; }
+    .job { display: none; }
+    .job.visible { display: block; }
+    .meta { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+    .metric { padding: 15px 18px; border-right: 1px solid var(--line); min-width: 0; }
+    .metric:last-child { border-right: 0; }
+    .metric span { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 750; margin-bottom: 4px; }
+    .metric strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status { color: var(--amber); }
+    .status.completed { color: var(--green); }
+    .status.failed { color: var(--coral); }
+    .transcript { padding: 20px; white-space: pre-wrap; max-height: 430px; overflow: auto; font: 14px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .error { color: var(--coral); }
+    footer { max-width: 1180px; margin: 0 auto; padding: 0 24px 28px; color: var(--muted); font-size: 12px; }
+    footer a { color: var(--cyan); }
+    @media (max-width: 780px) {
+      .workspace { grid-template-columns: 1fr; }
+      .meta { grid-template-columns: 1fr; }
+      .metric { border-right: 0; border-bottom: 1px solid var(--line); }
+      .metric:last-child { border-bottom: 0; }
+      main { padding-top: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>LinkScribe</div>
+      <div class="health"><span id="healthDot" class="dot"></span><span id="healthText">Checking service</span></div>
+    </div>
+  </header>
+  <main>
+    <h1>Transcription jobs</h1>
+    <p class="subtitle">Submit media and inspect the translated English transcript.</p>
+    <div class="workspace">
+      <section class="panel" aria-labelledby="submitHeading">
+        <div class="panel-head"><h2 id="submitHeading">New job</h2></div>
+        <form id="jobForm" class="form">
+          <label>API token<input id="token" type="password" autocomplete="off" required minlength="32"></label>
+          <label>Media URL<input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required></label>
+          <div class="actions">
+            <button id="submit" class="primary" type="submit">Submit job</button>
+            <button id="clear" class="secondary" type="button">Clear</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel result" aria-labelledby="resultHeading">
+        <div class="panel-head"><h2 id="resultHeading">Job result</h2></div>
+        <div id="empty" class="empty">No active job</div>
+        <div id="job" class="job">
+          <div class="meta">
+            <div class="metric"><span>Status</span><strong id="status" class="status">Queued</strong></div>
+            <div class="metric"><span>Source</span><strong id="source">-</strong></div>
+            <div class="metric"><span>Duration</span><strong id="duration">-</strong></div>
+          </div>
+          <div id="transcript" class="transcript">Waiting for worker...</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <footer>Temporary media is deleted after processing. Job records expire automatically. <a href="/privacy">Privacy</a></footer>
+  <script>
+    const byId = (id) => document.getElementById(id);
+    let pollTimer = null;
+    const headers = () => ({ "Content-Type": "application/json", "Authorization": `Bearer ${byId("token").value}` });
+
+    async function checkHealth() {
+      try {
+        const response = await fetch("/health");
+        const data = await response.json();
+        byId("healthText").textContent = data.worker_ready ? "Service ready" : "API online, worker unavailable";
+        byId("healthDot").classList.toggle("ok", data.status === "ok" && data.worker_ready);
+      } catch { byId("healthText").textContent = "Service unavailable"; }
+    }
+
+    function showJob(data) {
+      byId("empty").style.display = "none";
+      byId("job").classList.add("visible");
+      byId("status").textContent = data.status;
+      byId("status").className = `status ${data.status}`;
+      byId("source").textContent = data.source || "Detecting";
+      byId("duration").textContent = data.duration_seconds ? `${Math.round(data.duration_seconds)} sec` : "Detecting";
+      if (data.status === "completed") byId("transcript").textContent = data.transcript || "No transcript returned";
+      else if (data.status === "failed") {
+        byId("transcript").textContent = data.error || "Processing failed";
+        byId("transcript").classList.add("error");
+      } else byId("transcript").textContent = data.status === "queued" ? `Queue position: ${data.queue_position || 1}` : "Transcribing audio...";
+    }
+
+    async function poll(jobId) {
+      const response = await fetch(`/v1/jobs/${jobId}?wait_seconds=20`, { headers: headers() });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "Could not read job");
+      showJob(data);
+      if (["queued", "processing"].includes(data.status)) pollTimer = setTimeout(() => poll(jobId).catch(showError), 800);
+      else byId("submit").disabled = false;
+    }
+
+    function showError(error) {
+      byId("empty").style.display = "none";
+      byId("job").classList.add("visible");
+      byId("status").textContent = "Error";
+      byId("status").className = "status failed";
+      byId("transcript").textContent = error.message;
+      byId("transcript").classList.add("error");
+      byId("submit").disabled = false;
+    }
+
+    byId("jobForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearTimeout(pollTimer);
+      byId("submit").disabled = true;
+      byId("transcript").classList.remove("error");
+      try {
+        const response = await fetch("/v1/jobs", { method: "POST", headers: headers(), body: JSON.stringify({ url: byId("url").value }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Could not create job");
+        showJob(data);
+        await poll(data.id);
+      } catch (error) { showError(error); }
+    });
+
+    byId("clear").addEventListener("click", () => {
+      clearTimeout(pollTimer);
+      byId("jobForm").reset();
+      byId("job").classList.remove("visible");
+      byId("empty").style.display = "grid";
+      byId("submit").disabled = false;
+    });
+    checkHealth();
+  </script>
+</body>
+</html>

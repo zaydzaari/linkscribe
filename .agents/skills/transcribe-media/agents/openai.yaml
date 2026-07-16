@@ -1,0 +1,4 @@
+interface:
+  display_name: "Transcribe Media"
+  short_description: "Turn public media links into English text"
+  default_prompt: "Use $transcribe-media to understand and summarize this public media link."
