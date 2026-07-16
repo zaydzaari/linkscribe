@@ -3,7 +3,7 @@
 Thanks for improving LinkScribe.
 
 1. Fork the repository and create a focused branch.
-2. Install the development dependencies with `python -m pip install -e ".[dev]"`.
+2. Upgrade pip, then install development dependencies with `python -m pip install --upgrade pip` and `python -m pip install -e ".[dev]"`.
 3. Add or update tests for behavior changes.
 4. Run `ruff check .` and `python -m pytest --cov=linkscribe --cov=clients`.
 5. Open a pull request that explains the user-visible effect and deployment impact.

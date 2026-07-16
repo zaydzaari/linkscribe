@@ -181,6 +181,7 @@ See [SECURITY.md](SECURITY.md) for reporting and deployment guidance.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ruff check .
 python -m pytest --cov=linkscribe --cov=clients --cov-report=term-missing

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: LinkScribe
-  version: 0.1.1
+  version: 0.1.2
   description: Create and retrieve English transcripts from public media links.
 servers:
   - url: https://YOUR_PRIVATE_DOMAIN
