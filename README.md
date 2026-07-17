@@ -79,7 +79,7 @@ python clients/linkscribe.py transcribe \
   --output transcript.txt
 ```
 
-The command submits the job, long-polls until it finishes, retrieves every transcript chunk, and writes a UTF-8 text file.
+The command submits the job, long-polls until it finishes, retrieves every transcript chunk, and writes a UTF-8 text file. If YouTube explicitly blocks the VPS as a bot, the client can use `yt-dlp` on the caller's machine to retrieve public English captions without cookies. Disable that narrow fallback with `--no-local-caption-fallback`.
 
 ## Agent Integrations
 
@@ -163,6 +163,8 @@ SQLite jobs expire automatically after 24 hours by default. Temporary audio and 
 LinkScribe supports public media that yt-dlp can access without bypassing authentication, CAPTCHAs, paywalls, or private-media controls. Site changes can temporarily break extraction, so keep yt-dlp current by rerunning the installer.
 
 YouTube frequently challenges data-center IP addresses with "Sign in to confirm you're not a bot." LinkScribe reports that failure honestly. A permitted cookie file may help in some environments, but it is not guaranteed and can expose the associated account to platform enforcement. TikTok and Instagram availability also varies by region and source.
+
+For YouTube bot challenges, the deterministic client attempts public English captions from the caller's normal connection when a local `yt-dlp` executable is available. It uses `--ignore-config`, does not load browser cookies, and cannot help when the video has no accessible captions or the caller's network is also challenged.
 
 Whisper's native `--translate` mode translates supported spoken languages into English. It is usually sufficient for understanding and summarization, but it is speech translation rather than a general-purpose translation engine; names, jargon, overlapping speech, and noisy audio can be inaccurate.
 

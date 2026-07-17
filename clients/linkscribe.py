@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -16,6 +19,107 @@ from urllib.request import Request, urlopen
 
 class ClientError(RuntimeError):
     pass
+
+
+class JobFailedError(ClientError):
+    def __init__(self, job: dict) -> None:
+        self.job = job
+        super().__init__(job.get("error") or f"Job {job['status']}")
+
+
+def _is_youtube_bot_challenge(url: str, error: str) -> bool:
+    parsed = urlsplit(url)
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    is_youtube = hostname in {"youtu.be", "youtube.com"} or hostname.endswith(
+        ".youtube.com"
+    )
+    normalized_error = error.lower()
+    return (
+        is_youtube
+        and "sign in to confirm" in normalized_error
+        and "bot" in normalized_error
+    )
+
+
+def _parse_youtube_json3(path: Path) -> str:
+    if path.stat().st_size > 10 * 1024 * 1024:
+        raise ClientError("Public caption response is unexpectedly large")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ClientError("Public captions were not valid JSON") from exc
+
+    parts: list[str] = []
+    for event in payload.get("events", []):
+        segments = event.get("segs", []) if isinstance(event, dict) else []
+        text = "".join(
+            str(segment.get("utf8", ""))
+            for segment in segments
+            if isinstance(segment, dict)
+        )
+        text = " ".join(text.split())
+        if text and (not parts or text != parts[-1]):
+            parts.append(text)
+
+    transcript = " ".join(parts)
+    if not transcript:
+        raise ClientError("Public captions contained no spoken text")
+    return transcript
+
+
+def fetch_local_youtube_captions(url: str) -> str:
+    configured_binary = os.getenv("LINKSCRIBE_LOCAL_YTDLP_BIN", "").strip()
+    ytdlp = configured_binary or shutil.which("yt-dlp")
+    if not ytdlp:
+        raise ClientError("Local yt-dlp is required for the public-caption fallback")
+
+    with tempfile.TemporaryDirectory(prefix="linkscribe-captions-") as temp_dir:
+        output = Path(temp_dir) / "captions.%(ext)s"
+        command = [
+            ytdlp,
+            "--ignore-config",
+            "--no-playlist",
+            "--no-warnings",
+            "--no-progress",
+            "--skip-download",
+            "--write-subs",
+            "--write-auto-subs",
+            "--sub-langs",
+            "en-orig,en",
+            "--sub-format",
+            "json3",
+            "--output",
+            str(output),
+            url,
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ClientError("Local public-caption retrieval failed") from exc
+
+        if result.returncode != 0:
+            raise ClientError("Local public-caption retrieval failed")
+
+        candidates = sorted(
+            Path(temp_dir).glob("captions.*.json3"),
+            key=lambda path: (".en-orig." not in path.name, path.name),
+        )
+        if not candidates:
+            raise ClientError("This video has no accessible public English captions")
+
+        errors: list[ClientError] = []
+        for candidate in candidates:
+            try:
+                return _parse_youtube_json3(candidate)
+            except ClientError as exc:
+                errors.append(exc)
+        raise errors[-1]
 
 
 class LinkScribeClient:
@@ -91,8 +195,32 @@ class LinkScribeClient:
             if job["status"] == "completed":
                 return job
             if job["status"] in {"failed", "cancelled"}:
-                raise ClientError(job.get("error") or f"Job {job['status']}")
+                raise JobFailedError(job)
         raise ClientError(f"Job did not finish within {max_wait} seconds")
+
+
+def transcribe_url(
+    client: LinkScribeClient,
+    url: str,
+    *,
+    max_wait: int = 7200,
+    local_caption_fallback: bool = True,
+) -> str:
+    created = client.submit(url)
+    try:
+        client.wait(created["id"], max_wait=max_wait)
+    except JobFailedError as exc:
+        if not local_caption_fallback or not _is_youtube_bot_challenge(url, str(exc)):
+            raise
+        print(
+            "VPS download was challenged by YouTube; trying public captions locally.",
+            file=sys.stderr,
+        )
+        try:
+            return fetch_local_youtube_captions(url)
+        except ClientError as fallback_error:
+            raise ClientError(f"{exc}; {fallback_error}") from fallback_error
+    return client.transcript(created["id"])
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -119,6 +247,11 @@ def build_parser() -> argparse.ArgumentParser:
     transcribe.add_argument("url")
     transcribe.add_argument("--output", type=Path)
     transcribe.add_argument("--max-wait", type=int, default=7200)
+    transcribe.add_argument(
+        "--no-local-caption-fallback",
+        action="store_true",
+        help="Do not use public local YouTube captions after a VPS bot challenge",
+    )
     return parser
 
 
@@ -131,9 +264,12 @@ def main() -> int:
         elif args.command == "status":
             print(json.dumps(client.status(args.job_id), indent=2))
         else:
-            created = client.submit(args.url)
-            client.wait(created["id"], max_wait=args.max_wait)
-            transcript = client.transcript(created["id"])
+            transcript = transcribe_url(
+                client,
+                args.url,
+                max_wait=args.max_wait,
+                local_caption_fallback=not args.no_local_caption_fallback,
+            )
             if args.output:
                 args.output.write_text(transcript + "\n", encoding="utf-8")
                 print(str(args.output))
